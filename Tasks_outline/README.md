@@ -21,9 +21,12 @@ DC1).
 
 # Methods tasks (WIP)
 * Downloading, inspecting, and describing the data utilized in the study.
-> * This will entail finding all of the data and downloading it. Then uploading it to Github or another resource so we all have it avaiable on the cloud somewhere.
-> * Inspecting the data and describing would probably be telling what characteristics of the data are. Probably file sizes, organization, what kind of data is in these files, etc.
-> * NOTE ON BAM FILES: Hufford recommends to use samtools in Unix to inspect the file as BAM files are not human readable like SAM files. Class 4/19/2024
+    * This will entail finding all of the data and downloading it. Then uploading it to Github or another resource so we all have it avaiable on the cloud 
+      somewhere.
+    * Inspecting the data and describing would probably be telling what characteristics of the data are. Probably file sizes, organization, what kind of data is in 
+      these files, etc.
+    * NOTE ON BAM FILES: Hufford recommends to use samtools in Unix to inspect the file as BAM files are not human readable like SAM files if using UNIX. Class 
+      4/19/2024
 
 * Figure 1 and Figure 2 are the figures we can complete. Volcano plot, heat map, etc
 > * Need to process/filter the data: We applied a stringent filter on the data to remove the gene tags with sparse count data. Genes with at least 1 count per million (cpm) in at least half of the sample size were kept in the analysis. There are 62,069 gene tags in the raw data and 17,757 of them were kept in the analysis after the filter. The biological coefficient of variation (BCV) in the 136 RNA-seq samples was about 0.4, which indicates that a good quality of this dataset as a typical BCV value from a well-controlled experiment is 0.4 for human data [13].
