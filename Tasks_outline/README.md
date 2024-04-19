@@ -4,6 +4,14 @@
 * Break down the Methods into tasks on processing data, data analysis, figure generation, and extra figures we think might be good to have.
 * DOI 10.1007/s13277-015-3576-y
 
+# Tasks from the assignment:
+This should entail:
+* Downloading, inspecting, and describing the data utilized in the study.
+* Processing the data if necessary to format them for the analysis the group has chosen to reproduce.
+* Rerunning the analysis described in the manuscript using your personal computers or ISU HPC resources.
+* Providing visual summaries (e.g., ggplot figures) of your results.
+The graded deliverables that each group will provide will include a GitHub Repository and an In-Class Presentation.
+
 # Data
 * The phenotype including age at diagnosis, gender, and smoking history are also available from the public website (http://genome.cshlp.org/content/22/11/2109/suppl/
 DC1).
