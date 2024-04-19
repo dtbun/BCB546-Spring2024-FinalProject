@@ -2,6 +2,7 @@
 
 * Read the article and take notes on what is happening (these notes can be put together for the article description and what we need to do)
 * Break down the Methods into tasks on processing data, data analysis, figure generation, and extra figures we think might be good to have.
+* DOI 10.1007/s13277-015-3576-y
 
 # Data
 * The phenotype including age at diagnosis, gender, and smoking history are also available from the public website (http://genome.cshlp.org/content/22/11/2109/suppl/
