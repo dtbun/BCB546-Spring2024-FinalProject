@@ -16,7 +16,7 @@ The graded deliverables that each group will provide will include a GitHub Repos
 # Data
 * The phenotype including age at diagnosis, gender, and smoking history are also available from the public website (http://genome.cshlp.org/content/22/11/2109/suppl/
 DC1).
-* The transcriptome sequencing data from 68 lung adenocarcinoma patients with validated smoking status were downloaded from Gene Expression Omnibus (GEO) with accession number GSE40419.
+* The transcriptome sequencing data from 68 lung adenocarcinoma patients with validated smoking status were downloaded from Gene Expression Omnibus (GEO) with accession number GSE40419. https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE40419
 * For validation of genes identified in nonsmoker group, independent RNA-seq data from six nonsmoker patients were downloaded from GEO with accession number GSE37765 [12].
 
 # Methods tasks (WIP)
