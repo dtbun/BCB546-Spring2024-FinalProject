@@ -44,9 +44,11 @@ The graded deliverables that each group will provide will include a GitHub Repos
         6. After cleaning up the RNA-seq data, we also need to append data on if that LC sample is a smoker/nonsmoker. Need to transpose one of the files to append 
         data to.
         7. Then apply filter to take only genes with at least 1 counter per million (cpm) in at least half of the sample size? There are 62,069 gene tags in the 
-        raw data and 17,757 of them were kept in the analysis after the filter.- what does this mean?
+        raw data and 17,757 of them were kept in the analysis after the filter.- what does this mean? This needs to be done for Fig 2, but I'm not sure which data 
+        this is referring to.
 
 * Data processing/analysis
+* Figure 1.
     * Use edgeR to identify genes differently expressed between tumor/normal and nonsmoker/smoker patients
     * CLuster plot (fig 1a) the 136 RNA-seq samples from 68 patients based on leading log-fold change
     * They filtered the data for plots b and onward as mentioned previously.
@@ -60,6 +62,11 @@ The graded deliverables that each group will provide will include a GitHub Repos
       both group but with greater fold change in smoker patients, and (5) genes identified in both group with similar logFC value.
     * Then can do boxplot F in Fig 1. for logFC in these 5 groups.
     * Not sure what G in Fig 1 is.
+* Figure 2.
+    * Need to do the CPM analysis. Not sure which data that is referring to.
+    * a Heatmap of normalized count per million (CPM) for genes that behave differently between two groups. Yellow and green bar denote normal and tumor tissues, 
+      respectively. Nonsmoker group is on the left.
+    * b Bar plot of CPM for genes. Left, nonsmoker patients; right, smoker patients. Red and green colors denote CPM from normal and tumor tissues, respectively
     * Pair-end RNA-seq reads were aligned to human genome assembly Ensembl GRCh37 by Tophat. HTSeq was used to count the reads by genes (http://www- 
      huber.embl.de/users/anders/HTSeq/doc/tour.html#counting-reads-by-genes). We used R Bioconductor edgeR to perform the differential expression analysis, and we 
       applied a general linear model: lung tissue expression∼smoking+smoking:patient+ smoking:tissue to accommodate the multifactor design of the experiment.
