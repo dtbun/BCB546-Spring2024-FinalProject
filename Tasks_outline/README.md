@@ -77,7 +77,7 @@ The graded deliverables that each group will provide will include a GitHub Repos
 
 
 
-# Ignore this stuff
+# Extra info
 * Figure 1 b, c Volcano plots of signals from differential analysis in nonsmoker and smoker patients, respectively.
 
 
