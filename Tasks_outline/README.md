@@ -71,6 +71,13 @@ The graded deliverables that each group will provide will include a GitHub Repos
      huber.embl.de/users/anders/HTSeq/doc/tour.html#counting-reads-by-genes). We used R Bioconductor edgeR to perform the differential expression analysis, and we 
       applied a general linear model: lung tissue expression∼smoking+smoking:patient+ smoking:tissue to accommodate the multifactor design of the experiment.
 
+
+
+
+
+
+
+# Ignore this stuff
 * Figure 1 b, c Volcano plots of signals from differential analysis in nonsmoker and smoker patients, respectively.
 
 
