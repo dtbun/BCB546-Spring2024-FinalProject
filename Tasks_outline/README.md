@@ -30,7 +30,9 @@ DC1).
 
 * Figure 1 and Figure 2 are the figures we can complete. Volcano plot, heat map, etc
     * Need to process/filter the data: We applied a stringent filter on the data to remove the gene tags with sparse count data. Genes with at least 1 count per million (cpm) in at least half of the sample size were kept in the analysis. There are 62,069 gene tags in the raw data and 17,757 of them were kept in the analysis after the filter. The biological coefficient of variation (BCV) in the 136 RNA-seq samples was about 0.4, which indicates that a good quality of this dataset as a typical BCV value from a well-controlled experiment is 0.4 for human data [13].
-        1. Go through the gene
+        1. RNA-Seq data is 87 lung adenocarcinomas and 77 adjacent normal tissues, so need to remove 77 adjacent normal tissues and filter out to have similar 
+        amount to the reference journal. Samples LC_S1 - LC_52 are cancer. LC_C1 - LC_C52 are norm?
+        2. Download the .gz file. Extract with 7-Zip or your favorite file processor for this. Extracted .txt is found in Data folder.
 
 * Data processing
     * Pair-end RNA-seq reads were aligned to human genome assembly Ensembl GRCh37 by Tophat. HTSeq was used to count the reads by genes (http://www-huber.embl.de/users/anders/HTSeq/doc/tour.html#counting-reads-by-genes). We used R Bioconductor edgeR to perform the differential expression analysis, and we applied a general linear model: lung tissue expression∼smoking+smoking:patient+ smoking:tissue to accommodate the multifactor design of the experiment.
