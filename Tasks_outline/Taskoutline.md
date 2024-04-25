@@ -47,11 +47,18 @@ The graded deliverables that each group will provide will include a GitHub Repos
 
 # Figure 2
 * RNA-seq data
+    * I suspect we need to also use DESeq here too?
+    * RNA samples were prepared and analyzed as described for miR-seq.
+    * Differential expression analysis of genes between different treatments was performed 
+      using R package DESeq2 v1.18.1
+    * https://bioconductor.org/packages/release/bioc/html/KEGGgraph.html
+    * https://bioconductor.org/packages/release/bioc/html/ggkegg.html
 * A. Venn diagram to show fold changes between the two inhibitors
 * B. Correlation analysis of fold changes of the genes shared between PDE5-I and PDE9-I.
 * C and D KEGG pathways, but they do mention using R package KEGG?
 
 # Figure 3
+* 
 * Analysis was performed on the same samples used for sequencing analysis (n = 5 per group)
 *  qRT-PCR analysis for (A) pri-miRs, (B) pre-miRs, and (C) mature miRs for a panel of miRs selected from the larger sequencing data set that are associated with cardiac hypertrophy and fibrosis (pink diamond miRs from Figure 2, A–C)
 
