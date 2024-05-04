@@ -1,0 +1,57 @@
+---
+title: "miRNA_50%filtering"
+output: html_document
+date: "2024-05-04"
+---
+
+#Data loading and inspection
+
+```{r}
+#load the necessary packages: 
+library(dplyr) 
+library(tidyverse)
+
+```
+
+
+```{r}
+# Read the data from the text file
+countdata <- read.delim("raw_mirna.txt", header = TRUE, row.names = NULL )
+```
+
+```{r}
+# inspect the data: 
+View(countdata)
+typeof(countdata) # we have a list
+dim(countdata) # 1903 * 22: We have 1902 microRNA data on the rows and 21 samples on the column
+str(countdata) # we have a data framem with 1903 observations and 22 variables. The microRNA names are characters, and the count data itself are integers. We have several biological replicates. 
+```
+
+#Data Preprocessing as suggested by the paper
+```{r}
+#Removing microRNA present in less than 50% of the samples
+
+# Initialize a counter for rows containing 0
+zero_count <- 0
+
+# Index to store rows with more than 50% of 0s
+rows_to_keep <- numeric()
+
+#change NAs to 0
+countdata[is.na(countdata)] <- 0
+
+# Iterate through each row
+for (i in 1:nrow(countdata)) {
+  # Count the occurrences of 0 in the row
+   zeros_in_row <- sum(countdata[i, -1] == 0)  
+  
+  # If more than 50% of values in columns 2 to ncol(data) are zeros, store the row index
+  if (zeros_in_row < (ncol(countdata) - 1) / 2) {  # Exclude the first column
+    rows_to_keep <- c(rows_to_keep, i)
+  }
+  
+}
+
+# Create a new dataframe containing rows with more than 50% of 0s
+mirna_filtered <- countdata[rows_to_keep, ]    #Out of 1902 microRNA, 510 of them are present in more than 50% of the samples
+```

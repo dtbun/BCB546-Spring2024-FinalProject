@@ -1,0 +1,180 @@
+---
+title: "DGE_DESeq2_PO-PO+PDE9AI"
+author: "Vedika Desai"
+date: "2024-04-29"
+output: html_document
+---
+```{r}
+## clear environment
+rm(list=ls()) 
+```
+
+```{r}
+# used to manage Bioconductor packages
+# install.packages("BiocManager")
+# BiocManager::install("DESeq2")
+library(DESeq2)
+library(tidyverse)
+library(tidyr)
+library(data.table)
+library(dplyr)
+```
+
+```{r} 
+
+# Read the data from the text file
+pde9_data <- read.delim("mirna_filtered_final.txt", header = TRUE, row.names = NULL )
+pde9_data <- pde9_data[, c(1, 7:11, 17:21)] %>%
+  `row.names<-`(., NULL) %>%
+   column_to_rownames(var = "miRNA")
+# Rename column names
+new_column_names <- c("PO1", "PO2", "PO3",
+                       "PO4", "PO5", "PDE9.1",
+                       "PDE9.2", "PDE9.3", "PDE9.4",
+                       "PDE9.5")
+colnames(pde9_data) <- new_column_names
+```
+
+```{r}
+# Create a grouping variable
+group <- factor(c(rep("Control", 5), rep("Treated", 5)))
+
+# Create DESeqDataSet object
+dds <- DESeqDataSetFromMatrix(countData = pde9_data, colData = data.frame(group), design = ~ group)
+```
+
+```{r}
+# Normalize the data
+dds <- DESeq(dds)
+
+#contrast between PO and PO+PDE9AI
+contrast <- c("group", "Treated", "Control")
+
+# Perform differential expression analysis
+results <- results(dds, contrast=contrast)
+
+# Summary of results
+summary(results)
+
+# Order results by p-value
+results <- results[order(results$padj),]
+
+write.csv(results, "deseq2_results_VD.csv", row.names = TRUE)
+```
+
+```{r}
+# Filter significant results
+
+#significant_results <- subset(results, pvalue < 0.05)    or
+
+significance_threshold <- 0.05
+
+significant_results <- results[which(results$pvalue < significance_threshold), ]
+
+
+# View the significant results
+head(significant_results)
+
+write.csv(significant_results, "deseq2_sign.results_VD.csv", row.names = TRUE)
+
+```
+
+```{r}
+#Table with miRNA, Log2FoldChange and pvalue
+selected_columns<-significant_results[,c("log2FoldChange", "pvalue")]
+
+print(selected_columns)
+
+write.csv(selected_columns, "Filtered_significant.csv", row.names = TRUE)
+```
+
+#Visualisation 
+```{r}
+
+Volcano_PF9613_PO.png<- "Volcano_PO-PF9613_PO.png"
+
+  # Volcano plot
+par(mfrow=c(1,1))
+
+# Define colors based on different conditions
+colors <- ifelse(results$log2FoldChange > 1 & results$padj < 0.05, "black", 
+                 ifelse(results$log2FoldChange < -1 & results$padj < 0.05, "darkgreen",
+                        ifelse(results$log2FoldChange > 1, "purple", 
+                               ifelse(results$log2FoldChange < -1, "red", "blue"))))
+
+# Plot the volcano plot
+plot(results$log2FoldChange, -log10(results$pvalue), pch=20, main="Volcano plot of miRs altered in PO+PF-9613 versus PO", 
+     xlim=c(-3,3), ylim=c(0,30), xlab="log2FoldChange", ylab="-log10(pvalue)", col=colors)
+
+# Count the number of dots for each category
+significant_up <- sum(results$padj < 0.05 & results$log2FoldChange > 1)
+significant_down <- sum(results$padj < 0.05 & results$log2FoldChange < -1)
+upregulated <- sum(results$padj >= 0.05 & results$log2FoldChange > 1)
+downregulated <- sum(results$padj >= 0.05 & results$log2FoldChange < -1)
+non_significant <- sum(abs(results$log2FoldChange) <= 1 & results$pvalue >= 0.05)
+
+# Create legend labels with counts
+legend_labels <- c(paste("Significant upregulated (", significant_up, ")"),
+                   paste("Significant downregulated (", significant_down, ")"),
+                   paste("Upregulated (", upregulated, ")"),
+                   paste("Downregulated (", downregulated, ")"),
+                   paste("Non-significant (", non_significant, ")"))
+
+
+# Add legend with adjusted position
+legend("topright", legend=legend_labels,
+       col=c("black", "darkgreen", "purple", "red", "blue"), pch=20,
+       inset=c(0.05, 0.05), box.col = "transparent") # Adjust the inset values to position the legend
+
+# Save the plot as a PNG file Volcano_PO-PF9613_PO.png 
+dev.copy(png, Volcano_PF9613_PO.png) 
+dev.off()
+
+```
+#Heatmap:
+```{r}
+# Creating the heatmap:
+normalized_dds <- varianceStabilizingTransformation(dds, blind = FALSE)
+rlog_out <- rlog(dds, blind = FALSE) # transformed with rlog. 
+
+# quality check step (choosing which transformation):
+plotPCA(rlog_out, intgroup = "group") #use this one. 
+
+# build a results table comparing miRNA expression between AGAT deficient and wildtype conditions: 
+res_heatmap <- results(dds, contrast = c("group","Treated", "Control"))
+
+# apply the FDR correction (multiple testing)
+#res_heatmap$p_val_fdr <- p.adjust(res_heatmap$pvalue)
+
+# get rid of na's in order to plot: 
+sigs <- na.omit(res_heatmap)
+
+# subset significant results, based on FDR: 
+#sigs <- sigs[sigs$p_val_fdr < 0.05,]
+
+# make sigs into a dataframe: 
+sigs <- as.data.frame(sigs)
+
+mat <- counts(dds, normalized = TRUE)[rownames(sigs),]
+
+# z scale: 
+mat.z <- t(apply(mat, 1, scale))
+
+# add desired column names: 
+colnames(mat.z) <- c("PO_1","PO_2", "PO_3", "PO_4", "PO_5", "PO_PDE9AI_1", "PO_PDE9AI_2", "PO_PDE9AI_3", "PO_PDE9AI_4", "PO_PDE9AI_5")
+
+# make out heatmap: 
+library(gplots)
+mycol <- colorpanel(1000, low = "green", high = "red")
+
+heatmap.2(mat.z, dendrogram = "column", key = TRUE,
+          col = mycol, density.info="none", trace = "none",
+          margins=c(5,10))
+          
+```
+
+
+
+
+
+

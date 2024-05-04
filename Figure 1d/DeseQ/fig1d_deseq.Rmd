@@ -1,0 +1,111 @@
+---
+title: "Heatmap_DESeq2"
+author: "Vedika Desai"
+date: "2024-04-30"
+output: html_document
+---
+
+```{r}
+## clear environment
+rm(list=ls()) 
+```
+
+```{r}
+# used to manage Bioconductor packages
+# install.packages("BiocManager")
+# BiocManager::install("DESeq2")
+install.packages("DESeq2")
+library(DESeq2)
+library(tidyverse)
+library(tidyr)
+library(data.table)
+library(dplyr)
+library(pheatmap)
+```
+
+```{r}
+miRNA <- read_tsv("miRNA.txt")
+genecounts <- dplyr::select(miRNA, c("miRNA","165_sham 1_R1.fastq", "175_sham 2_R1.fastq",	"189_sham 3_R1.fastq",	"606_sham 4_R1.fastq",	"608_sham 5_R1.fastq",	"156_TAC 1_R1.fastq",	"157_TAC 2_R1.fastq",	"541_TAC 3_R1.fastq",	"612_TAC 4_R1.fastq",	"631_TAC 5_R1.fastq",	"533_TAC+PDE5AI 1_R1.fastq",	"536_TAC+PDE5AI 2_R1.fastq",	"627_TAC+PDE5AI 3_R1.fastq",	"647_TAC+PDE5AI 4_R1.fastq",	"697_TAC+PDE5AI 5_R1.fastq",	"151_TAC+PDE9AI 1_R1.fastq",	"528_TAC+PDE9AI 2_R1.fastq",	"529_TAC+PDE9AI 3_R1.fastq",	"531_TAC+PDE9AI 4_R1.fastq",	"542_TAC+PDE9AI 5_R1.fastq"))
+
+oldnames = c("165_sham 1_R1.fastq", "175_sham 2_R1.fastq",	"189_sham 3_R1.fastq",	"606_sham 4_R1.fastq",	"608_sham 5_R1.fastq",	"156_TAC 1_R1.fastq",	"157_TAC 2_R1.fastq",	"541_TAC 3_R1.fastq",	"612_TAC 4_R1.fastq",	"631_TAC 5_R1.fastq",	"533_TAC+PDE5AI 1_R1.fastq",	"536_TAC+PDE5AI 2_R1.fastq",	"627_TAC+PDE5AI 3_R1.fastq",	"647_TAC+PDE5AI 4_R1.fastq",	"697_TAC+PDE5AI 5_R1.fastq",	"151_TAC+PDE9AI 1_R1.fastq",	"528_TAC+PDE9AI 2_R1.fastq",	"529_TAC+PDE9AI 3_R1.fastq",	"531_TAC+PDE9AI 4_R1.fastq",	"542_TAC+PDE9AI 5_R1.fastq")
+
+newnames = c("Sham_1", "Sham_2","Sham_3", "Sham_4", "Sham_5","PO_1","PO_2", "PO_3", "PO_4", "PO_5", "PO_Sil_1", "PO_Sil_2","PO_Sil_3","PO_Sil_4","PO_Sil_5", "PO_PDE9AI_1", "PO_PDE9AI_2", "PO_PDE9AI_3", "PO_PDE9AI_4", "PO_PDE9AI_5")
+
+genecountsv2 <- genecounts %>% rename_with(~ newnames, all_of(oldnames))
+
+miRNAcount <- genecountsv2 %>%
+  `row.names<-`(., NULL) %>% 
+   column_to_rownames(var = "miRNA")
+```
+
+```{r}
+# Create a vector with the group names for each sample
+group_names <- c(rep("Control", 5), rep("Treated", 15))
+
+# Create a factor variable with the group names
+group <- factor(group_names, levels = c("Control", "Treated"))
+
+```
+
+
+```{r}
+# Create DESeqDataSet object
+dds <- DESeqDataSetFromMatrix(countData = miRNAcount, colData = data.frame(group), design = ~ group)
+```
+
+```{r}
+# Normalize the data
+dds <- DESeq(dds)
+
+# Perform differential expression analysis
+results <- results(dds)
+
+# Summary of results
+summary(results)
+
+# Order results by p-value
+results <- results[order(results$padj),]
+
+write.csv(results, "Heatmap_deseq2_results_VD.csv", row.names = TRUE)
+```
+
+```{r}
+
+# Filter significant results
+
+significant_results <- subset(results, padj < 0.05)    #or
+
+#significance_threshold <- 0.05
+
+#significant_results <- results[which(results$padj < significance_threshold), ]
+
+
+# View the significant results
+head(significant_results)
+
+write.csv(significant_results, "Heatmap_deseq2_sign.results_VD.csv", row.names = TRUE)
+```
+
+```{r}
+# Assuming miRNAcount contains the count data
+significant_genes <- significant_results$gene  # Extract significant gene names
+count_data_filtered <- miRNAcount[row.names(miRNAcount) %in% significant_genes, ]
+```
+
+```{r}
+log2_count_data <- log2(count_data_filtered + 1)  # Add pseudocount and log2 transform
+
+```
+
+```{r}
+# Create heatmap
+pheatmap(log2_count_data,  # Data for heatmap
+          cluster_rows = TRUE,  # Cluster rows
+          cluster_cols = TRUE,  # Cluster columns
+          color = colorRampPalette(c("blue", "white", "red"))(100),  # Color scheme
+          annotation_col = NULL,  # Optional: add sample metadata as column annotations
+          main = "Differential Expression Heatmap"  # Main title
+)
+
+```
+

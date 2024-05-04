@@ -1,0 +1,219 @@
+---
+title: "fig1b_Analysis"
+author: "Ashmita Mainali"
+date: "2024-04-29"
+output: html_document
+---
+
+```{r}
+
+# upload the necessary packages: 
+library(DESeq2) # differential gene expression analysis packet. 
+library(dplyr) 
+library(radiant)
+library(tidyverse)
+library(RColorBrewer)
+library(pheatmap)
+```
+
+```{r}
+
+# Read the data from the text file
+pde5_data <- read.delim("mirna_filtered_final.txt", header = TRUE, row.names = NULL )
+
+#This analysis has to undergo one more step of filtering as many treated data were zero
+
+# Calculate the sum of counts in each row from columns 6 to 10
+pde5_data$sum_6_to_10 <- rowSums(pde5_data[, 7:11], na.rm = TRUE)
+
+# Filter rows where the sum of counts from columns 6 to 10 is greater than 10
+pde5_data <- pde5_data[pde5_data$sum_6_to_10 > 0, ]
+
+pde5_data <- pde5_data[, c(1, 7:16)] %>%
+  `row.names<-`(., NULL) %>%
+   column_to_rownames(var = "miRNA")
+# Rename column names
+new_column_names <- c("PO1", "PO2", "PO3",
+                       "PO4", "PO5", "PDE5.1",
+                       "PDE5.2", "PDE5.3", "PDE5.4",
+                       "PDE5.5")
+colnames(pde5_data) <- new_column_names
+
+```
+`
+```{r}
+# making the coldata for DeSeq2
+
+# subset desired columns for analysis: 
+pde5_data <- subset(pde5_data, select = c("PO1", "PO2", "PO3",
+                       "PO4", "PO5", "PDE5.1",
+                       "PDE5.2", "PDE5.3", "PDE5.4",
+                       "PDE5.5"))
+
+# making the matrix - there are 10 total samples. 
+colData = matrix(c(1:10), ncol = 1, byrow = TRUE) 
+
+# the condition is the drug, so that is what we will want in the DeSeq object.
+colnames(colData) = "drug_treatment"
+
+# make it a dataframe for easier management. 
+colData <- as.data.frame(colData)
+
+# assigning the rownames for coldata - they should all match the column names in countdata. 
+rownames(colData) <- c("PO1", "PO2", "PO3", "PO4", "PO5", "PDE5.1",
+                       "PDE5.2", "PDE5.3", "PDE5.4",
+                       "PDE5.5")
+
+# adding in the genotypes - what the sample ID's correspond to.
+colData$drug_treatment = c('PO','PO','PO','PO','PO','PDE5','PDE5','PDE5','PDE5','PDE5')
+
+# check your dataframe. 
+View(colData)
+```
+
+```{r}
+# Making the DESeq object. 
+
+identical(colnames(pd5_data), rownames(colData)) #samples order is consistent. 
+
+# making the DESeq object. 
+dds <- DESeqDataSetFromMatrix(countData = pd5_data,
+                              colData = colData,
+                              design = ~ drug_treatment)
+
+# check on your DESeq object. 
+dds
+View(counts(dds))
+```
+`
+```{r}
+# Normalize the data (if not already done)
+dds <- DESeq(dds)
+
+# Contrast between PO+PDE5-I and PO
+contrast <- c("drug_treatment", "PDE5", "PO")
+
+
+# Perform differential expression analysis
+results <- results(dds, contrast = contrast)
+
+# View the first few rows of results in tidy format
+head(results(dds, tidy=TRUE))
+
+# Summary of results
+summary(results)
+
+# Order results by adjusted p-value
+results <- results[order(results$padj),]
+
+# View the first few rows of ordered results
+head(results)
+
+# Write all results to a CSV file
+write.csv(results, file = "deseq2_resultsPO+PDE5vsPO.csv", row.names = TRUE)
+
+# Filter significant results
+significant_results <- subset(results, padj < 0.05)
+
+# View the significant results
+head(significant_results)
+
+# Write significant results to a CSV file
+write.csv(significant_results, file = "deseq2_sig_resultsPO+PDE5vsPO.csv", row.names = TRUE)
+
+```
+
+
+```{r}
+Volcano_PD5_PO.png<- "Volcano_PD5_PO.png"
+  # Volcano plot
+par(mfrow=c(1,1))
+# Define colors based on different conditions
+colors <- ifelse(results$log2FoldChange > 1 & results$padj < 0.05, "black",
+                 ifelse(results$log2FoldChange < -1 & results$padj < 0.05, "darkgreen",
+                        ifelse(results$log2FoldChange > 1, "purple",
+                               ifelse(results$log2FoldChange < -1, "red", "blue"))))
+# Plot the volcano plot
+plot(results$log2FoldChange, -log10(results$pvalue), pch=20, main="Volcano plot of miRs altered in PO+PDE5 versus PO",
+     xlim=c(-3,3), ylim=c(0,30), xlab="log2FoldChange", ylab="-log10(pvalue)", col=colors)
+# Count the number of dots for each category
+#upregulated <- sum(results$log2FoldChange > 1 & results$padj >= 0.05)
+#downregulated <- sum(results$log2FoldChange < -1 & results$pvalue >= 0.05)
+#significant_up <- sum(results$log2FoldChange > 1 & results$pvalue < 0.05)
+#significant_down <- sum(results$log2FoldChange < -1 & results$pvalue < 0.05)
+#non_significant <- sum(results$log2FoldChange <= 1 & results$log2FoldChange >= -1 & results$pvalue >= 0.05)
+# Count the number of dots for each category
+significant_up <- sum(results$padj < 0.05 & results$log2FoldChange > 1)
+significant_down <- sum(results$padj < 0.05 & results$log2FoldChange < -1)
+upregulated <- sum(results$padj >= 0.05 & results$log2FoldChange > 1)
+downregulated <- sum(results$padj >= 0.05 & results$log2FoldChange < -1)
+non_significant <- sum(abs(results$log2FoldChange) <= 1 & results$pvalue >= 0.05)
+# Create legend labels with counts
+legend_labels <- c(paste("Significant upregulated (", significant_up, ")"),
+                   paste("Significant downregulated (", significant_down, ")"),
+                   paste("Upregulated (", upregulated, ")"),
+                   paste("Downregulated (", downregulated, ")"),
+                   paste("Non-significant (", non_significant, ")"))
+# Add legend with adjusted position
+legend("topright", legend=legend_labels,
+       col=c("black", "darkgreen", "purple", "red", "blue"), pch=20,
+       inset=c(0.05, 0.05), box.col = "transparent") # Adjust the inset values to position the legend
+# Save the plot as a PNG file Volcano_PO-PF9613_PO.png
+dev.copy(png, Volcano_PD5_PO.png)
+dev.off()
+
+
+```
+
+
+
+```{r}
+# Recreating the heatmap:
+
+normalized_dds <- varianceStabilizingTransformation(dds, blind = FALSE)
+rlog_out <- rlog(dds, blind = FALSE) # transformed with rlog and varianceStabilizingTransformation - rlog looked a little better. 
+
+# quality check step (choosing which transformation): 
+plotPCA(rlog_out, intgroup = "drug_treatment")
+
+# build a results table comparing miRNA expression between AGAT deficient and wildtype conditions: 
+res_heatmap <- results(dds,contrast <- c("drug_treatment", "PDE5", "PO"))
+
+# apply the FDR correction (multiple testing)
+res_heatmap$p_val_fdr <- p.adjust(res_heatmap$pvalue, method = "fdr")
+
+# get rid of na's in order to plot: 
+sigs <- na.omit(res_heatmap)
+
+# subset significant results, based on FDR: 
+sigs <- sigs[sigs$p_val_fdr < 0.05,]
+
+# make sigs into a dataframe: 
+sigs <- as.data.frame(sigs)
+
+mat <- counts(dds, normalized = TRUE)[rownames(sigs),]
+
+# z scale: 
+mat.z <- t(apply(mat, 1, scale))
+
+# add desired column names: 
+colnames(mat.z) <- c('PO1','PO2','PO3','PO4','PO5','PDE5-1','PDE5-2','PDE5-3','PDE5-4','PDE5-5')
+
+# Open PDF file to save the heatmap
+pdf("heatmap.pdf")
+
+# make out heatmap: 
+library(gplots)
+mycol <- colorpanel(1000, low = "yellow", high = "red")
+
+heatmap.2(mat.z, dendrogram = "column", key = TRUE,
+          col = mycol, density.info="none", trace = "none",
+          margins=c(5,10))
+# Close the PDF device
+dev.off()
+          
+```
+
+
+
+

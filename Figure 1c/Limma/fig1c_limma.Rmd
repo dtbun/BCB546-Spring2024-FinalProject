@@ -1,0 +1,224 @@
+---
+title: "BCB project"
+output: html_notebook
+---
+
+# PROJECT: REPLICATING RESULTS FROM FIGURE 1 FROM PAPER “Marked disparity of microRNA modulation by cGMP-selective PDE5 versus PDE9 inhibitors in heart disease” from Kokkonen-Simon et al. (2018, DOI: 10.1172/jci.insight.121739).
+
+* ANALYSIS: treatment PO+PDE9-I compared to PO Volcano plot.
+DATA: non-coding RNA - Series GSE112054_Merged_miRge_microRNA_Counts_Kokkonen-Simon.txt.gz
+
+* GOAL: Using LIMMA/GLIMMA/EDGER approach for RNA-seq analysis in R to analyze mRNA data to replicate figure 1 of the paper.
+
+* Following workflow from https://www.bioconductor.org/packages/devel/workflows/vignettes/RNAseq123/inst/doc/limmaWorkflow.html
+
+
+# 1. SET UP
+
+```{r SET UP}
+# Install BioConductor package and modules
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+#BiocManager::install("edgeR", dependencies = TRUE, update = TRUE, ask = FALSE)
+#BiocManager::install("limma", dependencies = TRUE, update = TRUE, ask = FALSE)
+#BiocManager::install("Glimma", dependencies = TRUE, update = TRUE, ask = FALSE)
+#BiocManager::install("DESeq2", dependencies = TRUE, update = TRUE, ask = FALSE)
+#BiocManager::install('EnhancedVolcano', dependencies = TRUE, update = TRUE, ask = FALSE)
+
+#install.packages('gplots')
+#install.packages('tidyverse')
+#install.packages('tidyr')
+#install.packages('data.table')
+#install.packages('dplyr')
+
+# Load necessary libraries
+library(tidyverse)
+library(tidyr)
+library(data.table)
+library(dplyr)
+
+library(EnhancedVolcano) 
+library(DESeq2)
+library(limma)
+library(Glimma)
+library(edgeR)
+library(gplots)
+library(tibble)
+```
+
+
+# 2. Prepare data
+
+The data has been filtered from the raw data in Series GSE112054 from NCBI GEO. (https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE112054)
+
+```{r}
+#Load data and call columns of interest
+
+miRNA_filtered <- read_tsv("miRNA_filtered_final.txt")
+
+miRNA_counts1 <- dplyr::select(miRNA_filtered, c("miRNA","156_TAC 1_R1.fastq","157_TAC 2_R1.fastq", "541_TAC 3_R1.fastq", "612_TAC 4_R1.fastq", "631_TAC 5_R1.fastq", "151_TAC+PDE9AI 1_R1.fastq", "528_TAC+PDE9AI 2_R1.fastq", "529_TAC+PDE9AI 3_R1.fastq", "531_TAC+PDE9AI 4_R1.fastq", "542_TAC+PDE9AI 5_R1.fastq"))
+
+# Rename column names
+oldnames = c("156_TAC 1_R1.fastq","157_TAC 2_R1.fastq", "541_TAC 3_R1.fastq", "612_TAC 4_R1.fastq", "631_TAC 5_R1.fastq", "151_TAC+PDE9AI 1_R1.fastq", "528_TAC+PDE9AI 2_R1.fastq", "529_TAC+PDE9AI 3_R1.fastq", "531_TAC+PDE9AI 4_R1.fastq", "542_TAC+PDE9AI 5_R1.fastq")
+newnames = c("PO_1","PO_2", "PO_3", "PO_4", "PO_5", "PO_PDE9_1", "PO_PDE9_2", "PO_PDE9_3", "PO_PDE9_4", "PO_PDE9_5")
+
+miRNA_counts2 <- miRNA_counts1 %>% rename_with(~ newnames, all_of(oldnames))
+
+# Restructuring data so that the miRNA names become row names
+
+miRNA_counts <- miRNA_counts2 %>%
+  `row.names<-`(., NULL) %>% 
+   column_to_rownames(var = "miRNA")
+
+```
+```{r}
+# Creating a DGEList Object for differential gene expression analysis
+DGE <- DGEList(counts=miRNA_counts)
+# Defining groups for the DGE object
+group <- as.factor(c("PO", "PO", "PO", "PO", "PO", "PO_PDE9", "PO_PDE9", "PO_PDE9", "PO_PDE9","PO_PDE9"))
+DGE$samples$group <- group
+# Renaming columns from the DGE object to match the names defined earlier
+colnames(DGE) <- newnames
+# Creating a data frame containing the miRNA names and adds it as a column to the DGE object.
+miRNA <- row.names(DGE)
+miRNA <- data.frame(miRNA)
+DGE$miRNA <- miRNA
+
+```
+
+```{r}
+# Normalize and transform data for further analysis
+cpm <- cpm(DGE)
+Lcpm <- cpm(DGE, log=TRUE)
+logCPM <- cpm(DGE, log=TRUE, prior.count=3)
+
+DGE <- calcNormFactors(DGE, method = "TMM")
+
+```
+
+# 4. Diferential expression analysis workflow
+
+```{r}
+# Create matrix
+matrix <- model.matrix(~0+group)
+# Adjust column names
+colnames(matrix) <- gsub("group", "", colnames(matrix))
+# Create contrasts to compare respective control-treatment conditions
+contr.matrix <- makeContrasts(KOvsWT = PO_PDE9 - PO, levels = colnames(matrix))
+# Transform count data in DGEList object to log-counts-per-million using voom method
+par(mfrow=c(1,2))
+v <- voom(DGE, matrix, plot=TRUE)
+# Fits linear model and apply the specified contrasts to it.
+#png("")
+vfit <- lmFit(v, matrix) 
+vfit <- contrasts.fit(vfit, contrasts=contr.matrix) 
+# t-Statistical tests using the Bayes moderation of the standard errors in the linear model fit. 
+efit <- eBayes(vfit, trend=TRUE) 
+plotSA(efit, main="Final model: Mean-variance trend")
+# Sets log-fold change threshold to 1
+tfit <- treat(vfit, lfc=1) 
+
+# Identify the Differentially Expressed Genes (DEGs) based on the t-statistics, using different specified parameters. Note that we did not use any adjust method for P adjust, since it was retrieving cero DEGs. However we did use the p value to obtain 
+topTreat <- topTreat(tfit, coef=1, n=Inf, p.value = 0.05, sort.by="P", adjust.method="none") 
+topTable <- topTable(efit, coef=1 , n=Inf, p.value = 0.05, sort.by="P", adjust.method="none") 
+#write.csv(topTable, "miRNA_limma_eBayes.csv", row.names=TRUE) 
+
+```
+# 5. Volcano plots to visualize differential expression results
+
+
+```{r}
+# Define the file name for the PNG plot
+volcano_png <- "volcano_plot.png"
+
+# Define colors based on different conditions
+colors <- ifelse(efit$t > 1 & efit$p.value < 0.05, "blue", 
+                 ifelse(efit$t < -1 & efit$p.value < 0.05, "darkgreen",
+                        ifelse(efit$t > 1, "purple", 
+                               ifelse(efit$t < -1, "red", "black"))))
+
+# Plot the volcano plot
+plot(efit$t, -log10(efit$p.value), pch=20, main="PO VS PO+PDE9 with Limma", 
+     xlim=c(-3,3), ylim=c(0,30), xlab="Log2-Fold-Change", ylab="-log10(pvalue)", col=colors)
+
+# Count the number of dots for each category
+upregulated <- sum(efit$t > 1 & efit$p.value >= 0.05)
+downregulated <- sum(efit$t < -1 & efit$p.value >= 0.05)
+significant_up <- sum(efit$t > 1 & efit$p.value < 0.05)
+significant_down <- sum(efit$t < -1 & efit$p.value < 0.05)
+non_significant <- sum(efit$t <= 1 & efit$t >= -1 & efit$p.value >= 0.05)
+
+# Create legend labels with counts
+legend_labels <- c(paste("Significant upregulated (", significant_up, ")"),
+                   paste("Significant downregulated (", significant_down, ")"),
+                   paste("Upregulated (", upregulated, ")"),
+                   paste("Downregulated (", downregulated, ")"),
+                   paste("Non-significant (", non_significant, ")"))
+
+# Add legend with adjusted position
+legend("topright", legend=legend_labels, 
+       col=c("blue", "darkgreen", "purple", "red", "black"), pch=20, 
+       inset=c(0.05, 0.05), box.col = "transparent") # Adjust the inset values to position the legend
+
+# Save the plot as a PNG file
+dev.copy(png, volcano_png)
+dev.off()
+
+```
+
+```{r}
+
+heatmap_png <- "heatmap_plot.png"
+
+# Creating logCPMv2 DataFrame:
+logCPMv2 <- data.frame(logCPM)
+# Adding miRNA names
+logCPMv2$miRNA <- row.names(logCPMv2)
+# Handle Differential expression results
+eBayes_PO.vs.PO_PDE9 <- topTable #duplicate data
+eBayes_miRNAs <- row.names(eBayes_PO.vs.PO_PDE9)
+eBayes_PO.vs.PO_PDE9$eBayes_miRNAs <- eBayes_miRNAs #add miRNAs to dataframe
+eBayes_PO.vs.PO_PDE9.topgenes <- eBayes_PO.vs.PO_PDE9$eBayes_miRNAs[1:12] #top DE genes with adjusted p-value < 0.05
+i <- which(logCPMv2$miRNA %in% eBayes_PO.vs.PO_PDE9.topgenes) #returns the position which satisfies the given condition of the top DE genes from the eBayes method
+
+# Heatmap visualization
+mycol <- colorpanel(1000, low = "green", high = "red") #low to high miRNA expresion is represented by a change of color from green to red
+par(mar = c(3, 4, 2, 10))
+heatmap.2(logCPM[,], scale = "row", labRow = logCPMv2$miRNA[], lab..0Col = group, margins = c(8,7), offsetRow = 0.1, offsetCol = 0.1, col = mycol, trace = "none", density.info = "none", dendrogram = "column", key = TRUE, symkey = FALSE, keysize = 1.5, key.title = NULL, cexRow = 0.8, cexCol = 0.8) # Adjust font size (0.8 is just an example))
+
+# Save the plot as a PNG file
+dev.copy(png, heatmap_png)
+dev.off()
+
+```
+```{r}
+# Assuming df is your data frame
+selected_columns <- topTable[, c("logFC", "P.Value")]
+
+print(selected_columns)
+```
+
+
+```{r}
+# Create a data frame to store the differences
+differences <- data.frame(
+  Analysis = c("DESeq", "limma"),
+  Model_Type = c("Negative binomial GLM", "Linear model"),
+  Assumptions = c("No assumptions about distribution or variance", "Assumes normally distributed data and equal variance"),
+  Data_Type = c("RNA-Seq counts data", "Microarray or RNA-Seq data"),
+  Batch_Effects = c("Accounted for using the design formula", "Accounted for using empirical Bayes shrinkage"),
+  Sample_Size = c("Tends to require larger sample sizes", "Can handle smaller sample sizes effectively"),
+  Interpretation = c("Identifies differentially expressed genes using Wald test or Likelihood ratio test", 
+                     "Empirical Bayes moderated t-statistics or eBayes p-values"),
+  Number_of_Tests = c("Performs tests for each gene or feature individually", 
+                      "Performs moderated t-tests for each gene or feature"),
+  Software = c("R packages: DESeq2", "R package: limma-voom"),
+  Citation = c("Anders and Huber (2010)", "Ritchie et al. (2015)")
+)
+
+# Print the table
+print(differences)
+
+```
+

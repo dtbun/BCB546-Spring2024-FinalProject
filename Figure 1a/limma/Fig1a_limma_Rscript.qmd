@@ -1,0 +1,163 @@
+---
+title: "Figure 1a R code limma DEA analysis"
+format: html
+---
+
+```{r}
+#download necessary packages to run analysis.
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("edgeR")
+BiocManager::install("limma")
+BiocManager::install("Glimma")
+BiocManager::install("DESeq2")
+BiocManager::install('EnhancedVolcano')
+
+install.packages('gplots')
+install.packages('tidyverse')
+install.packages('tidyr')
+install.packages('data.table')
+install.packages('dplyr')
+
+```
+
+```{r}
+#load necessary packages to do analysis
+library(tidyverse)
+library(tidyr)
+library(data.table)
+library(dplyr)
+
+library(EnhancedVolcano) 
+library(DESeq2)
+library(limma)
+library(Glimma)
+library(edgeR)
+library(gplots)
+library(tibble)
+```
+
+Some more procesing of the data
+
+```{r}
+#open file and save to miRNA object
+miRNA <- read_tsv("miRNA_filtered_final.txt")
+
+#select only the columns we need miRNA names, Sham/PO using dplyr 
+genecounts <- dplyr::select(miRNA, c("miRNA", "165_sham 1_R1.fastq", "175_sham 2_R1.fastq", "189_sham 3_R1.fastq", "606_sham 4_R1.fastq", "608_sham 5_R1.fastq", "156_TAC 1_R1.fastq","157_TAC 2_R1.fastq", "541_TAC 3_R1.fastq", "612_TAC 4_R1.fastq", "631_TAC 5_R1.fastq"))
+
+#create old name for R to refer to when replacing
+oldnames = c("165_sham 1_R1.fastq", "175_sham 2_R1.fastq", "189_sham 3_R1.fastq", "606_sham 4_R1.fastq", "608_sham 5_R1.fastq", "156_TAC 1_R1.fastq","157_TAC 2_R1.fastq", "541_TAC 3_R1.fastq", "612_TAC 4_R1.fastq", "631_TAC 5_R1.fastq")
+
+#create new names to simplify the naming convention of samples
+newnames = c("Sham_1","Sham_2", "Sham_3", "Sham_4", "Sham_5", "PO_1", "PO_2", "PO_3", "PO_4", "PO_5")
+
+#rename the columns with the simplified names
+genecountsv2 <- genecounts %>% rename_with(~ newnames, all_of(oldnames))
+
+#get rid of rownames (null) and then take the first column and conver to rownames
+miRNAcount <- genecountsv2 %>%
+  `row.names<-`(., NULL) %>% 
+   column_to_rownames(var = "miRNA")
+
+# Creating a DGEList Object for differential gene expression analysis
+DGE <- DGEList(counts=miRNAcount)
+# Defining groups for the DGE object to know what to contrast against
+group <- as.factor(c("Sham", "Sham", "Sham", "Sham", "Sham", "PO", "PO", "PO", "PO", "PO"))
+# Renaming columns from the DGE object to match the names defined earlier
+DGE$samples$group <- group
+colnames(DGE) <- newnames
+
+# Creating a data frame containing the miRNA names and adds it as a column to the DGE object.
+miRNA <- row.names(DGE)
+miRNA <- data.frame(miRNA)
+DGE$miRNA <- miRNA
+
+```
+
+```{r}
+# Normalize and transform data for further analysis as counts per million (cpm) and log(CPM) are more useful
+cpm <- cpm(DGE)
+Lcpm <- cpm(DGE, log=TRUE)
+logCPM <- cpm(DGE, log=TRUE, prior.count=3)
+
+#The filterByExpr function in the edgeR package provides an automatic way to filter genes, 
+#while keeping as many genes as possible with worthwhile counts.
+keep.exprs <- filterByExpr(DGE, group=group,min.count=1)
+DGE <- DGE[keep.exprs,, keep.lib.sizes=FALSE]
+
+#normalisation by the method of trimmed mean of M-values (TMM)
+DGE <- calcNormFactors(DGE, method = "TMM")
+
+```
+
+```{r}
+# Create matrix
+matrix <- model.matrix(~0+group)
+# Adjust column names
+colnames(matrix) <- gsub("group", "", colnames(matrix))
+# Create contrasts to compare respective control and treatment conditions
+contr.matrix <- makeContrasts(KOvsWT = PO - Sham, levels = colnames(matrix))
+
+# Transform count data in DGEList object to log-counts-per-million using voom method
+par(mfrow=c(1,2))
+v <- voom(DGE, matrix, plot=TRUE)
+
+# Fits linear model and apply the specified contrasts to it.
+vfit <- lmFit(v, matrix) 
+vfit <- contrasts.fit(vfit, contrasts=contr.matrix) 
+
+# t-Statistical tests using the Bayes moderation of the standard errors in the linear model fit. 
+efit <- eBayes(vfit, trend=TRUE)
+plotSA(efit, main="Final model: Mean-variance trend")
+
+# Sets log-fold change threshold to 1
+tfit <- treat(vfit, lfc=1) 
+
+# Identify the Differentially Expressed Genes (DEGs) based on the t-statistics, using different specified parameters
+topTreat <- topTreat(tfit, coef=1, n=Inf, p.value = 0.05, sort.by="P", adjust.method="BH") 
+topTable <- topTable(efit, coef=1 , n=Inf, p.value = 0.05, sort.by="P", adjust.method="BH") 
+
+# write tsv file with miRNA list
+write.table(topTable, "limma_miRNA_DEA_fig1a.tsv", row.names=TRUE,col.names=TRUE, quote=FALSE, sep='\t') 
+
+```
+
+https://rdrr.io/bioc/limma/man/volcanoplot.html
+```{r}
+#load .png file to save to
+volcano_png <- "limma_fig1a_final.png"
+
+# Define colors based on different conditions
+colors <- ifelse(efit$t > 1 & efit$p.value < 0.05, "blue", 
+                 ifelse(efit$t < -1 & efit$p.value < 0.05, "darkgreen",
+                        ifelse(efit$t > 1, "purple", 
+                               ifelse(efit$t < -1, "red", "black"))))
+
+volcanoplot(efit, coef = 1, style = "p-value", highlight = 0, names = tfit$genes$ID, hl.col="blue", xlab = "Log2 Fold Change", ylab = NULL, pch=20, cex=0.35, main="PO VS Sham with Limma", col=colors, xlim=c(-3,3), ylim=c(0,30))
+
+# Count the number of dots for each category
+upregulated <- sum(efit$t > 1 & efit$p.value >= 0.05)
+downregulated <- sum(efit$t < -1 & efit$p.value >= 0.05)
+significant_up <- sum(efit$t > 1 & efit$p.value < 0.05)
+significant_down <- sum(efit$t < -1 & efit$p.value < 0.05)
+non_significant <- sum(efit$t <= 1 & efit$t >= -1 & efit$p.value >= 0.05)
+
+# Create legend labels with counts
+legend_labels <- c(paste("Significant upregulated (", significant_up, ")"),
+                   paste("Significant downregulated (", significant_down, ")"),
+                   paste("Upregulated (", upregulated, ")"),
+                   paste("Downregulated (", downregulated, ")"),
+                   paste("Non-significant (", non_significant, ")"))
+
+# Add legend with adjusted position
+legend("topright", legend=legend_labels, 
+       col=c("blue", "darkgreen", "purple", "red", "black"), pch=20, 
+       inset=c(0.05, 0.05), box.col = "transparent") # Adjust the inset values to position the legend
+
+#allows copying of volcano plot to png file we opened earlier then turn off
+dev.copy(png, volcano_png)
+dev.off()
+
+```
